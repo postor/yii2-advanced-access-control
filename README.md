@@ -1,60 +1,117 @@
-<p align="center">
-    <a href="https://github.com/yiisoft" target="_blank">
-        <img src="https://avatars0.githubusercontent.com/u/993323" height="100px">
-    </a>
-    <h1 align="center">Yii 2 Advanced Project Template</h1>
-    <br>
-</p>
+# 定制yii2的权限控制
 
-Yii 2 Advanced Project Template is a skeleton [Yii 2](http://www.yiiframework.com/) application best for
-developing complex Web applications with multiple tiers.
+基于yii2-advanced模板
 
-The template includes three tiers: front end, back end, and console, each of which
-is a separate Yii application.
+## 启动此项目
 
-The template is designed to work in a team development environment. It supports
-deploying the application in different environments.
-
-Documentation is at [docs/guide/README.md](docs/guide/README.md).
-
-[![Latest Stable Version](https://img.shields.io/packagist/v/yiisoft/yii2-app-advanced.svg)](https://packagist.org/packages/yiisoft/yii2-app-advanced)
-[![Total Downloads](https://img.shields.io/packagist/dt/yiisoft/yii2-app-advanced.svg)](https://packagist.org/packages/yiisoft/yii2-app-advanced)
-[![Build Status](https://travis-ci.org/yiisoft/yii2-app-advanced.svg?branch=master)](https://travis-ci.org/yiisoft/yii2-app-advanced)
-
-DIRECTORY STRUCTURE
--------------------
+### 迁出
 
 ```
-common
-    config/              contains shared configurations
-    mail/                contains view files for e-mails
-    models/              contains model classes used in both backend and frontend
-    tests/               contains tests for common classes    
-console
-    config/              contains console configurations
-    controllers/         contains console controllers (commands)
-    migrations/          contains database migrations
-    models/              contains console-specific model classes
-    runtime/             contains files generated during runtime
-backend
-    assets/              contains application assets such as JavaScript and CSS
-    config/              contains backend configurations
-    controllers/         contains Web controller classes
-    models/              contains backend-specific model classes
-    runtime/             contains files generated during runtime
-    tests/               contains tests for backend application    
-    views/               contains view files for the Web application
-    web/                 contains the entry script and Web resources
-frontend
-    assets/              contains application assets such as JavaScript and CSS
-    config/              contains frontend configurations
-    controllers/         contains Web controller classes
-    models/              contains frontend-specific model classes
-    runtime/             contains files generated during runtime
-    tests/               contains tests for frontend application
-    views/               contains view files for the Web application
-    web/                 contains the entry script and Web resources
-    widgets/             contains frontend widgets
-vendor/                  contains dependent 3rd-party packages
-environments/            contains environment-based overrides
+git clone xxx
+cd xxx
+```
+
+### 初始化环境，选dev可以看调试信息
+
+```
+./init
+```
+
+### 准备好mysql数据库，填好配置
+
+`common/config/main-local.php`
+
+```
+<?php
+return [
+    'components' => [
+        'db' => [
+            'class' => 'yii\db\Connection',
+            'dsn' => 'mysql:host=localhost;dbname=test',
+            'username' => 'root',
+            'password' => '',
+            'charset' => 'utf8',
+        ],
+        'mailer' => [
+            'class' => 'yii\swiftmailer\Mailer',
+            'viewPath' => '@common/mail',
+            // send all mails to a file by default. You have to set
+            // 'useFileTransport' to false and configure a transport
+            // for the mailer to send real emails.
+            'useFileTransport' => true,
+        ],
+    ],
+];
+```
+
+### 初始化数据库
+
+```
+./yii migrate
+```
+
+### 启动服务并体验
+
+```
+./yii serve --docroot="frontend/web/"
+```
+
+## 核心代码解释
+
+`frontend/controllers/TestController`
+
+```
+<?php
+namespace frontend\controllers;
+use yii\filters\AccessControl;
+use Yii;
+
+class TestController extends \yii\web\Controller
+{
+    //使用behaviors，权限控制只是behavior的一种，了解更多：http://www.digpage.com/behavior.html
+    public function behaviors()
+    {
+        return [
+            'access' => [
+                //使用AccessControl类来管理权限，了解更多：https://www.yiiframework.com/doc/api/2.0/yii-filters-accesscontrol
+                'class' => AccessControl::className(),
+                'rules' => [                    
+                    [
+                        //规则这里只指定了allow，没有指定action，默认为应用所有action， 了解更多：https://www.yiiframework.com/doc/api/2.0/yii-filters-accessrule
+                        'allow' => true,
+
+                        //使用一个回调来决定是否应用此规则，了解更多：https://www.yiiframework.com/doc/api/2.0/yii-filters-accessrule#$matchCallback-detail
+                        'matchCallback' => function ($rule, $action) {
+                            //登录才能访问
+                            if(Yii::$app->user->isGuest){
+                                return false;
+                            }                            
+                            
+                            //只有用户名包含test的用户才能访问
+                            $user = Yii::$app->user->getIdentity();
+                            if(strpos($user->username,'test')>=0){
+                                
+                                //nottesting不允许包含testing的用户访问
+                                if($action->id =='nottesting' && strpos($user->username,'testing')>=0){
+                                    return false;
+                                }  
+
+                                return true;
+                            }                              
+                        },
+                    ],
+                ],
+            ],
+        ];
+    }
+    public function actionIndex()
+    {
+        return $this->render('index');
+    }    
+    public function actionNottesting()
+    {
+        return $this->render('nottesting');
+    }
+}
+
 ```

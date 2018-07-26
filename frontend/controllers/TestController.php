@@ -35,9 +35,7 @@ class TestController extends \yii\web\Controller
                                 }  
 
                                 return true;
-                            }  
-
-                            
+                            }                              
                         },
                     ],
                 ],
